@@ -81,6 +81,8 @@ class ReportFrame(wx.Frame):
         # self.output = wx.StaticText(self.panel, label='0')
         update = wx.Button(self.panel, label='Update')
 
+        update.Bind(wx.EVT_BUTTON, self.update)
+
         self.sizer.Add(title, 0, wx.ALL | wx.ALIGN_CENTER, 5)
         self.input_sizer.Add(self.grant_list, 0, wx.ALL | wx.CENTER, 5)
         self.input_sizer.Add(self.protocol_list, 0, wx.ALL | wx.CENTER, 5)
@@ -90,6 +92,8 @@ class ReportFrame(wx.Frame):
         self.input_sizer.Add(self.end_date, 0, wx.ALL | wx.CENTER, 5)
         self.input_sizer.Add(update, 0, wx.ALL | wx.CENTER, 5)
         self.sizer.Add(self.input_sizer, 0, wx.ALL | wx.ALIGN_CENTER, 5)
+        self.sizer.Add(wx.StaticLine(self.panel, -1),
+                       flag=wx.ALL | wx.EXPAND, border=5)
         # self.sizer.Add(self.panel, 0, wx.ALL | wx.ALIGN_CENTER, 5)
 
         # self.input_panel.SetSizer(self.input_sizer)
@@ -105,16 +109,17 @@ class ReportFrame(wx.Frame):
 
     def fill_options(self):
         cat = wx.StaticText(self.panel, label='Ethnic Categories')
-        # cat.SetFont(self.small_bold)
         self.output_sizer.Add(cat, pos=(0, 1),
-                              span=wx.GBSpan(1, 9), flag=wx.ALIGN_CENTER)
+                              span=wx.GBSpan(1, 16), flag=wx.ALIGN_CENTER)
+        self.output_sizer.Add(wx.StaticLine(self.panel, -1),
+                              pos=(1, 1), flag=wx.ALL | wx.EXPAND, border=5, span=wx.GBSpan(1, 16))
         self.grant_list.InsertItems([g.replace(' ', '').split(',')[1] for g in self.project.export_metadata(
             fields=['grant'])[0]['select_choices_or_calculations'].split('|')], 0)
         self.protocol_list.InsertItems([p.replace(' ', '').split(',')[1] for p in self.project.export_metadata(
             fields=['protocol'])[0]['select_choices_or_calculations'].split('|')], 0)
 
         global RACES
-        RACES = [r.replace(' ', '').split(',')[1] for r in self.project.export_metadata(
+        RACES = [r.split(', ')[1].strip() for r in self.project.export_metadata(
             fields=['race'])[0]['select_choices_or_calculations'].split('|')]
         self.fill_races()
 
@@ -127,8 +132,9 @@ class ReportFrame(wx.Frame):
         GENDERS = [e.split(', ')[1].strip() for e in self.project.export_metadata(
             fields=['gender'])[0]['select_choices_or_calculations'].split('|')]
         self.fill_genders()
-        self.fill_numbers()
-        self.output_sizer.Add(wx.StaticText(self.panel, label='<- Total Enrolled'), pos=(11, 11),
+        self.fill_zeros()
+        self.print_grid_bag(self.output_sizer)
+        self.output_sizer.Add(wx.StaticText(self.panel, label='<- Total Enrolled'), pos=(12, 15),
                               flag=wx.ALL | wx.ALIGN_RIGHT, border=5)
         self.sizer.Add(self.output_sizer, 0, wx.ALL | wx.ALIGN_CENTER, 5)
         self.sizer.AddSpacer(20)
@@ -144,34 +150,65 @@ class ReportFrame(wx.Frame):
                 i_pos += 1
             i_race += 1
 
-        self.output_sizer.Add(wx.StaticText(self.panel, label='Totals by Gender/Ethnicity'), pos=(4 + i_pos, 0),
+        self.output_sizer.Add(wx.StaticLine(self.panel, style=wx.LI_HORIZONTAL),
+                              pos=(4 + i_pos, 0), flag=wx.EXPAND)
+
+        self.output_sizer.Add(wx.StaticText(self.panel, label='Totals by Gender/Ethnicity'), pos=(5 + i_pos, 0),
                               flag=wx.ALL | wx.ALIGN_RIGHT, border=5)
         self.sizer.Fit(self)
 
     def fill_ethnicities(self):
         for i in range(len(ETHNICITIES)):
+            self.output_sizer.Add(wx.StaticLine(self.panel, style=wx.LI_VERTICAL),
+                                  pos=(3, (i * 4) + 1), flag=wx.EXPAND, border=0,
+                                  span=wx.GBSpan(10, 1))
             self.output_sizer.Add(wx.StaticText(self.panel, label=ETHNICITIES[i]),
-                                  pos=(2, (i*3)+1), flag=wx.ALL | wx.ALIGN_CENTER, border=5, span=wx.GBSpan(1, 3))
+                                  pos=(2, (i * 4) + 2), flag=wx.ALL | wx.ALIGN_CENTER, border=5, span=wx.GBSpan(1, 3))
+        self.output_sizer.Add(wx.StaticLine(self.panel, style=wx.LI_VERTICAL),
+                              pos=(3, (len(ETHNICITIES) * 4) + 1), flag=wx.ALL | wx.EXPAND, border=5,
+                              span=wx.GBSpan(10, 1))
         self.sizer.Fit(self)
 
     def fill_genders(self):
-        for i in range(3):
+        for i in range(len(ETHNICITIES)):
             for j in range(len(GENDERS)):
                 self.output_sizer.Add(wx.StaticText(self.panel, label=GENDERS[j]),
-                                      pos=(3, (i * 3) + 1 + j), flag=wx.ALL | wx.ALIGN_CENTER, border=5)
-        self.output_sizer.Add(wx.StaticText(self.panel, label='Totals By Race'),
-                              pos=(3, 10), flag=wx.ALL | wx.ALIGN_CENTER, border=5)
-        self.output_sizer.Add(wx.StaticLine(self.panel, size=(2, 50), style=wx.LI_VERTICAL),
-                              pos=(3, 11), flag=wx.ALL | wx.ALIGN_CENTER, border=5)
+                                      pos=(3, (i * 4) + 2 + j), flag=wx.ALL | wx.ALIGN_CENTER, border=5)
 
-    def fill_numbers(self):
-        for i in range(10):
-            self.fill_column(i, '0')
+        self.output_sizer.Add(wx.StaticText(self.panel, label='Totals By Race'),
+                              pos=(3, 14), flag=wx.ALL | wx.ALIGN_CENTER, border=5)
+
+    def fill_zeros(self):
+        for i in range(len(ETHNICITIES)+1):
+            if i == len(ETHNICITIES):
+                self.fill_column((i * 4) + 2, '0')
+            else:
+                for j in range(len(GENDERS)):
+                    self.fill_column((i * 4) + 2 + j, '0')
 
     def fill_column(self, col, content):
         for i in range(8):
-            self.output_sizer.Add(wx.StaticText(self.panel, label='0'), pos=(i+4, col+1),
+            offset = 0
+            if i == 7:
+                offset = 1
+            self.output_sizer.Add(wx.StaticText(self.panel, label=content), pos=(i + 4 + offset, col),
                                   flag=wx.ALIGN_CENTER, border=5)
+
+    def update(self, evt):
+        print(self.start_date.GetValue())
+        if self.start_date.GetValue() > self.end_date.GetValue():
+            print("error")
+
+    def print_grid_bag(self, sizer):
+        for row in range(sizer.GetEffectiveRowsCount()):
+            for col in range(sizer.GetEffectiveColsCount()):
+                item = sizer.FindItemAtPosition((row, col))
+                if item:
+                    print("X", end=' ')
+                else:
+                    print("_", end=' ')
+            print()
+
 
 if __name__ == '__main__':
     app = wx.App()
