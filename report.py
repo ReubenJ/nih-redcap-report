@@ -4,7 +4,8 @@ import wx.adv
 
 USE_DATEPICKCTRL = 1
 
-RACES = []  # ['American Indian/Alaska Native', 'Asian', 'Native Hawaiian/Pacific Islander', 'Black or African American',
+RACES = []  # ['American Indian/Alaska Native', 'Asian', 'Native Hawaiian/Pacific Islander',
+# 'Black or African American',
 # 'White', 'More Than One Race', 'Unknown or Not Reported', 'Totals by Gender/Ethnicity']
 ETHNICITIES = []
 GENDERS = []
@@ -60,6 +61,7 @@ class ReportFrame(wx.Frame):
         super().__init__(parent=None, title='NIH Report')
         self.api_key = None
         self.project = None
+        self.enrollments = []
 
         self.panel = wx.Panel(self, wx.ID_ANY)
         # self.input_panel = wx.Panel(self.panel, wx.ID_ANY, style=wx.RAISED_BORDER)
@@ -80,8 +82,10 @@ class ReportFrame(wx.Frame):
         self.protocol_list = wx.ListBox(self.panel, style=wx.LB_MULTIPLE)
         # self.output = wx.StaticText(self.panel, label='0')
         update = wx.Button(self.panel, label='Update')
+        clear = wx.Button(self.panel, label='Reset')
 
         update.Bind(wx.EVT_BUTTON, self.update)
+        clear.Bind(wx.EVT_BUTTON, self.clear)
 
         self.sizer.Add(title, 0, wx.ALL | wx.ALIGN_CENTER, 5)
         self.input_sizer.Add(self.grant_list, 0, wx.ALL | wx.CENTER, 5)
@@ -91,6 +95,7 @@ class ReportFrame(wx.Frame):
         self.input_sizer.Add(self.end_label, 0, wx.ALL | wx.CENTER, 5)
         self.input_sizer.Add(self.end_date, 0, wx.ALL | wx.CENTER, 5)
         self.input_sizer.Add(update, 0, wx.ALL | wx.CENTER, 5)
+        self.input_sizer.Add(clear, 0, wx.ALL | wx.CENTER, 5)
         self.sizer.Add(self.input_sizer, 0, wx.ALL | wx.ALIGN_CENTER, 5)
         self.sizer.Add(wx.StaticLine(self.panel, -1),
                        flag=wx.ALL | wx.EXPAND, border=5)
@@ -103,9 +108,6 @@ class ReportFrame(wx.Frame):
         self.Show()  # put main window in background
 
         frame = APIKeyFrame(parent=self)
-
-    def print_api_key(self):
-        print(self.api_key)
 
     def fill_options(self):
         cat = wx.StaticText(self.panel, label='Ethnic Categories')
@@ -133,7 +135,7 @@ class ReportFrame(wx.Frame):
             fields=['gender'])[0]['select_choices_or_calculations'].split('|')]
         self.fill_genders()
         self.fill_zeros()
-        self.print_grid_bag(self.output_sizer)
+        # self.print_grid_bag(self.output_sizer)
         self.output_sizer.Add(wx.StaticText(self.panel, label='<- Total Enrolled'), pos=(12, 15),
                               flag=wx.ALL | wx.ALIGN_RIGHT, border=5)
         self.sizer.Add(self.output_sizer, 0, wx.ALL | wx.ALIGN_CENTER, 5)
@@ -195,9 +197,43 @@ class ReportFrame(wx.Frame):
                                   flag=wx.ALIGN_CENTER, border=5)
 
     def update(self, evt):
-        print(self.start_date.GetValue())
         if self.start_date.GetValue() > self.end_date.GetValue():
-            print("error")
+
+        self.enrollments = self.project.export_records(raw_or_label='label', fields=['enrollment',
+                                                                                     'grant',
+                                                                                     'protocol'])
+        print(self.get_number_of_grants_protocols())
+        grant_selection = [self.grant_list.GetItems()[i] for i in self.grant_list.GetSelections()]
+        protocol_selection = [self.protocol_list.GetItems()[i] for i in self.protocol_list.GetSelections()]
+        ids = self.filter_enrollments(protocol_selection, grant_selection)
+        participants = self.project.export_records(records=ids, raw_or_label='label', fields=['gender', 'ethnicity', 'race'])
+        self.fill_table(participants)
+
+    def filter_enrollments(self, pr_sel, gr_sel):
+        ids = []
+        for e in self.enrollments:
+            if e.get('grant') and e.get('protocol') and e.get('enrollment'):
+                if e.get('grant') in gr_sel and e.get('protocol') in pr_sel:
+                    enrollment = wx.DateTime()
+                    enrollment.ParseISODate(e['enrollment'])
+                    if self.start_date.GetValue() < enrollment < self.end_date.GetValue():
+                        ids.append(e.get('record_id'))
+        print(ids)
+        return ids
+
+    def clear(self, evt):
+        self.grant_list.SetSelection(-1)
+        self.protocol_list.SetSelection(-1)
+        self.start_date.SetValue(wx.DateTime.Now())
+        self.end_date.SetValue(wx.DateTime.Now())
+
+    def get_number_of_grants_protocols(self):
+        count = 0
+        for r in self.enrollments:
+            if r['redcap_repeat_instrument']:
+                count += 1
+
+        return count
 
     def print_grid_bag(self, sizer):
         for row in range(sizer.GetEffectiveRowsCount()):
