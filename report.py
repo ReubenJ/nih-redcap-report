@@ -308,7 +308,7 @@ class ReportFrame(wx.Frame):
                 if e.get('grant') in gr_sel and e.get('protocol') in pr_sel:
                     enrollment = wx.DateTime()
                     enrollment.ParseISODate(e['enrollment'])
-                    if self.start_date.GetValue() < enrollment < self.end_date.GetValue():
+                    if self.start_date.GetValue() <= enrollment <= self.end_date.GetValue():
                         ids.append(e.get('record_id'))
         return ids
 
