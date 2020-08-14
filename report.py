@@ -87,9 +87,12 @@ class ReportFrame(wx.Frame):
         update = wx.Button(self.panel, label='Update')
         update.SetDefault()
         clear = wx.Button(self.panel, label='Reset')
+        self.export = wx.Button(self.panel, label='Export to CSV')
+        self.export.Disable()
 
         update.Bind(wx.EVT_BUTTON, self.update)
         clear.Bind(wx.EVT_BUTTON, self.clear)
+        self.export.Bind(wx.EVT_BUTTON, self.onExport)
 
         self.sizer.Add(title, 0, wx.ALL | wx.ALIGN_CENTER, 5)
         self.input_sizer.Add(self.grant_list, 0, wx.ALL | wx.CENTER, 5)
@@ -114,6 +117,21 @@ class ReportFrame(wx.Frame):
 
         frame = APIKeyFrame(parent=self)
 
+    def onExport(self, evt):
+        with wx.FileDialog(self, "Filename to save", defaultFile='report.csv',
+                           style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT) as dlg:
+            if dlg.ShowModal() == wx.ID_CANCEL:
+                return
+            pathname = dlg.GetPath()
+            try:
+                with open(pathname, 'w') as file:
+                    self.doSaveFile(file)
+            except IOError:
+                wx.LogError("Cannot save file")
+
+    def doSaveFile(self, file):
+        file
+
     def fill_options(self):
         self.grant_list.InsertItems([g.replace(' ', '').split(',')[1] for g in self.project.export_metadata(
             fields=['grant'])[0]['select_choices_or_calculations'].split('|')], 0)
@@ -121,6 +139,8 @@ class ReportFrame(wx.Frame):
             fields=['protocol'])[0]['select_choices_or_calculations'].split('|')], 0)
         self.fill_output()
         self.sizer.Add(self.output_sizer, 0, wx.ALL | wx.ALIGN_CENTER, 5)
+        self.sizer.AddSpacer(20)
+        self.sizer.Add(self.export, 0, wx.RIGHT | wx.ALIGN_RIGHT, 50)
         self.sizer.AddSpacer(20)
         self.sizer.Fit(self)
 
@@ -146,7 +166,6 @@ class ReportFrame(wx.Frame):
             fields=['gender'])[0]['select_choices_or_calculations'].split('|')]
         self.fill_genders()
         self.fill_zeros()
-        # self.print_grid_bag(self.output_sizer)
         self.output_sizer.Add(wx.StaticText(self.panel, label='<- Total Enrolled'), pos=(12, 15),
                               flag=wx.ALL | wx.ALIGN_RIGHT, border=5)
 
@@ -211,6 +230,7 @@ class ReportFrame(wx.Frame):
             self.error.SetForegroundColour(wx.RED)
             self.error.Show()
             self.sizer.Fit(self)
+            self.export.Disable()
             return
 
         self.enrollments = self.project.export_records(raw_or_label='label', fields=['enrollment', 'grant', 'protocol'])
@@ -224,6 +244,7 @@ class ReportFrame(wx.Frame):
             self.fill_table(string='0')
 
         self.sizer.Fit(self)
+        self.export.Enable()
 
     def filter_enrollments(self, pr_sel, gr_sel):
         ids = []
