@@ -1,6 +1,7 @@
 import wx
 import redcap
 import wx.adv
+import csv
 
 USE_DATEPICKCTRL = 1
 
@@ -20,7 +21,7 @@ class APIKeyFrame(wx.Frame):
         self.sizer = wx.BoxSizer(wx.VERTICAL)
 
         text = wx.StaticText(self.panel, label='Paste your api key and REDCap url below:')
-        self.api_key_text = wx.TextCtrl(self.panel, value='35C5648FC6507875553AFF69D2768E3B', size=wx.Size(300, 10))
+        self.api_key_text = wx.TextCtrl(self.panel, value='', size=wx.Size(300, 10))
         self.redcap_url_text = wx.TextCtrl(self.panel, value="https://redcap.ahc.umn.edu/api/")
         self.error_str = wx.StaticText(self.panel, label='')
         self.error_str.Hide()
@@ -62,6 +63,7 @@ class ReportFrame(wx.Frame):
         self.api_key = None
         self.project = None
         self.enrollments = []
+        self.participants = None
 
         self.panel = wx.Panel(self, wx.ID_ANY)
         # self.input_panel = wx.Panel(self.panel, wx.ID_ANY, style=wx.RAISED_BORDER)
@@ -118,19 +120,68 @@ class ReportFrame(wx.Frame):
         frame = APIKeyFrame(parent=self)
 
     def onExport(self, evt):
-        with wx.FileDialog(self, "Filename to save", defaultFile='report.csv',
+        with wx.FileDialog(self, "Filename to save", defaultFile='report_' +
+                                                                 self.start_date.GetValue().FormatISODate() +
+                                                                 '_to_' +
+                                                                 self.end_date.GetValue().FormatISODate() + '.csv',
+                           defaultDir=wx.StandardPaths.GetDocumentsDir(wx.StandardPaths.Get()),
                            style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT) as dlg:
             if dlg.ShowModal() == wx.ID_CANCEL:
                 return
             pathname = dlg.GetPath()
             try:
-                with open(pathname, 'w') as file:
-                    self.doSaveFile(file)
+                with open(pathname, 'w', newline='') as file:
+                    self.do_save_file(file)
             except IOError:
                 wx.LogError("Cannot save file")
 
-    def doSaveFile(self, file):
-        file
+    def do_save_file(self, file):
+        if not self.participants:
+            self.error.SetLabel('Can\'t export with no data')
+            self.error.Show()
+            self.panel.Fit()
+            return
+
+        reportwriter = csv.writer(file, delimiter=',',
+                                  quotechar='|', quoting=csv.QUOTE_MINIMAL)
+
+        # Headers
+        reportwriter.writerow(['Grants:'] + [self.grant_list.GetItems()[i] for i in self.grant_list.GetSelections()])
+        reportwriter.writerow(['Protocols:'] + [self.protocol_list.GetItems()[i]
+                                                for i in self.protocol_list.GetSelections()])
+        row = ['']
+        for eth in range(len(ETHNICITIES)):
+            for gen in range(len(GENDERS)):
+                row.append(ETHNICITIES[eth] + '/' + GENDERS[gen])
+        reportwriter.writerow(row)
+
+        # Table and row sums
+        for race in range(len(RACES)):
+            row = [RACES[race]]
+            race_tot = 0
+            for eth in range(len(ETHNICITIES)):
+                for gen in range(len(GENDERS)):
+                    count = self.get_count_with_filter(self.participants, RACES[race], GENDERS[gen], ETHNICITIES[eth])
+                    race_tot += count
+                    row.append(count)
+            row.append(race_tot)
+            reportwriter.writerow(row)
+
+        # Column sums
+        row = ['Totals by Gender and Ethnicity']
+        for eth in range(len(ETHNICITIES)):
+            for gen in range(len(GENDERS)):
+                gen_tot = 0
+                for race in range(len(RACES)):
+                    count = self.get_count_with_filter(self.participants, RACES[race], GENDERS[gen], ETHNICITIES[eth])
+                    gen_tot += count
+                row.append(gen_tot)
+        row.append(len(self.participants))
+        row.append('<- Total enrollments')
+        reportwriter.writerow(row)
+
+
+
 
     def fill_options(self):
         self.grant_list.InsertItems([g.replace(' ', '').split(',')[1] for g in self.project.export_metadata(
@@ -224,8 +275,11 @@ class ReportFrame(wx.Frame):
                                   flag=wx.ALIGN_CENTER, border=5)
 
     def update(self, evt):
+        print(self.start_date.GetValue().FormatISODate())
+        self.participants = None
         self.error.Hide()
         if self.start_date.GetValue() > self.end_date.GetValue():
+            self.export.Disable()
             self.error.SetLabelText('Start date must be earlier than end date.')
             self.error.SetForegroundColour(wx.RED)
             self.error.Show()
@@ -238,13 +292,14 @@ class ReportFrame(wx.Frame):
         protocol_selection = [self.protocol_list.GetItems()[i] for i in self.protocol_list.GetSelections()]
         ids = self.filter_enrollments(protocol_selection, grant_selection)
         if ids:
-            participants = self.project.export_records(records=ids, raw_or_label='label', fields=['gender', 'ethnicity', 'race'])
-            self.fill_table(participants=participants)
+            self.participants = self.project.export_records(records=ids, raw_or_label='label', fields=['gender', 'ethnicity', 'race'])
+            self.fill_table(participants=self.participants)
+            self.export.Enable()
         else:
+            self.export.Disable()
             self.fill_table(string='0')
 
         self.sizer.Fit(self)
-        self.export.Enable()
 
     def filter_enrollments(self, pr_sel, gr_sel):
         ids = []
@@ -255,7 +310,6 @@ class ReportFrame(wx.Frame):
                     enrollment.ParseISODate(e['enrollment'])
                     if self.start_date.GetValue() < enrollment < self.end_date.GetValue():
                         ids.append(e.get('record_id'))
-        print(ids)
         return ids
 
     def fill_table(self, participants=None, string=None):
