@@ -184,9 +184,9 @@ class ReportFrame(wx.Frame):
 
 
     def fill_options(self):
-        self.grant_list.InsertItems([g.replace(' ', '').split(',')[1] for g in self.project.export_metadata(
+        self.grant_list.InsertItems([g.split(',')[1].strip() for g in self.project.export_metadata(
             fields=['grant'])[0]['select_choices_or_calculations'].split('|')], 0)
-        self.protocol_list.InsertItems([p.replace(' ', '').split(',')[1] for p in self.project.export_metadata(
+        self.protocol_list.InsertItems([p.split(',')[1].strip() for p in self.project.export_metadata(
             fields=['protocol'])[0]['select_choices_or_calculations'].split('|')], 0)
         self.fill_output()
         self.sizer.Add(self.output_sizer, 0, wx.ALL | wx.ALIGN_CENTER, 5)
@@ -275,7 +275,6 @@ class ReportFrame(wx.Frame):
                                   flag=wx.ALIGN_CENTER, border=5)
 
     def update(self, evt):
-        print(self.start_date.GetValue().FormatISODate())
         self.participants = None
         self.error.Hide()
         if self.start_date.GetValue() > self.end_date.GetValue():
