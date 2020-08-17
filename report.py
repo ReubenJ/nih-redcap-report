@@ -5,11 +5,10 @@ import csv
 
 USE_DATEPICKCTRL = 1
 
-RACES = []  # ['American Indian/Alaska Native', 'Asian', 'Native Hawaiian/Pacific Islander',
-# 'Black or African American',
-# 'White', 'More Than One Race', 'Unknown or Not Reported', 'Totals by Gender/Ethnicity']
-ETHNICITIES = []
-GENDERS = []
+RACES = ['American Indian/Alaska Native', 'Asian', 'Native Hawaiian or Other Pacific Islander',
+         'Black or African American', 'White', 'More Than One Race', 'Unknown']  # , 'Totals by Gender/Ethnicity']
+ETHNICITIES = ['Not Hispanic or Latino', 'Hispanic or Latino', 'Unknown']
+GENDERS = ['Female', 'Male', 'Unknown']
 
 
 class APIKeyFrame(wx.Frame):
@@ -66,29 +65,37 @@ class ReportFrame(wx.Frame):
         self.participants = None
 
         self.panel = wx.Panel(self, wx.ID_ANY)
-        # self.input_panel = wx.Panel(self.panel, wx.ID_ANY, style=wx.RAISED_BORDER)
         self.panel.Disable()  # disable interaction with main window
         self.sizer = wx.BoxSizer(wx.VERTICAL)
         self.input_sizer = wx.BoxSizer()
         self.output_sizer = wx.GridBagSizer(11, 11)
+        menubar = wx.MenuBar()
+        file_menu = wx.Menu()
+        self.menuExport = file_menu.Append(wx.ID_SAVEAS, 'Export .csv', 'Export .csv report')
+        self.menuExport.Enable(enable=False)
+        menubar.Append(file_menu, '&File')
+        self.SetMenuBar(menubar)
 
-        title = wx.StaticText(self.panel, label='Cumulative Enrollment Report')
+        self.Bind(wx.EVT_MENU, self.onExport, self.menuExport)
+
         self.error = wx.StaticText(self.panel)
         self.error.Hide()
         self.error.SetForegroundColour(wx.RED)
+
+        title = wx.StaticText(self.panel, label='Cumulative Enrollment Report')
         self.bold = wx.Font(18, wx.DEFAULT, wx.NORMAL, wx.BOLD)
         self.small_bold = wx.Font(12, wx.DEFAULT, wx.NORMAL, wx.BOLD)
         title.SetFont(self.bold)
+
         self.start_label = wx.StaticText(self.panel, label='From')
         self.start_date = wx.adv.DatePickerCtrl(self.panel)
         self.end_label = wx.StaticText(self.panel, label='to')
         self.end_date = wx.adv.DatePickerCtrl(self.panel)
         self.grant_list = wx.ListBox(self.panel, style=wx.LB_MULTIPLE)
         self.protocol_list = wx.ListBox(self.panel, style=wx.LB_MULTIPLE)
-        # self.output = wx.StaticText(self.panel, label='0')
         update = wx.Button(self.panel, label='Update')
         update.SetDefault()
-        clear = wx.Button(self.panel, label='Reset')
+        clear = wx.Button(self.panel, label='Reset Options')
         self.export = wx.Button(self.panel, label='Export to CSV')
         self.export.Disable()
 
@@ -96,7 +103,6 @@ class ReportFrame(wx.Frame):
         clear.Bind(wx.EVT_BUTTON, self.clear)
         self.export.Bind(wx.EVT_BUTTON, self.onExport)
 
-        self.sizer.Add(title, 0, wx.ALL | wx.ALIGN_CENTER, 5)
         self.input_sizer.Add(self.grant_list, 0, wx.ALL | wx.CENTER, 5)
         self.input_sizer.Add(self.protocol_list, 0, wx.ALL | wx.CENTER, 5)
         self.input_sizer.Add(self.start_label, 0, wx.ALL | wx.CENTER, 5)
@@ -105,13 +111,16 @@ class ReportFrame(wx.Frame):
         self.input_sizer.Add(self.end_date, 0, wx.ALL | wx.CENTER, 5)
         self.input_sizer.Add(update, 0, wx.ALL | wx.CENTER, 5)
         self.input_sizer.Add(clear, 0, wx.ALL | wx.CENTER, 5)
+
+        self.sizer.Add(title, 0, wx.ALL | wx.ALIGN_CENTER, 5)
         self.sizer.Add(self.input_sizer, 0, wx.ALL | wx.ALIGN_CENTER, 5)
         self.sizer.Add(self.error, 0, wx.ALL | wx.ALIGN_CENTER, 5)
-        self.sizer.Add(wx.StaticLine(self.panel, -1),
-                       flag=wx.ALL | wx.EXPAND, border=5)
-        # self.sizer.Add(self.panel, 0, wx.ALL | wx.ALIGN_CENTER, 5)
+        self.sizer.Add(wx.StaticLine(self.panel, -1), flag=wx.ALL | wx.EXPAND, border=5)
+        self.sizer.Add(self.output_sizer, 0, wx.ALL | wx.ALIGN_CENTER, 5)
+        self.sizer.AddSpacer(20)
+        self.sizer.Add(self.export, 0, wx.RIGHT | wx.ALIGN_RIGHT, 50)
+        self.sizer.AddSpacer(20)
 
-        # self.input_panel.SetSizer(self.input_sizer)
         self.panel.SetSizer(self.sizer)
         self.sizer.Fit(self)
 
@@ -180,19 +189,12 @@ class ReportFrame(wx.Frame):
         row.append('<- Total enrollments')
         reportwriter.writerow(row)
 
-
-
-
     def fill_options(self):
         self.grant_list.InsertItems([g.split(',')[1].strip() for g in self.project.export_metadata(
             fields=['grant'])[0]['select_choices_or_calculations'].split('|')], 0)
         self.protocol_list.InsertItems([p.split(',')[1].strip() for p in self.project.export_metadata(
             fields=['protocol'])[0]['select_choices_or_calculations'].split('|')], 0)
         self.fill_output()
-        self.sizer.Add(self.output_sizer, 0, wx.ALL | wx.ALIGN_CENTER, 5)
-        self.sizer.AddSpacer(20)
-        self.sizer.Add(self.export, 0, wx.RIGHT | wx.ALIGN_RIGHT, 50)
-        self.sizer.AddSpacer(20)
         self.sizer.Fit(self)
 
     def fill_output(self):
@@ -202,21 +204,11 @@ class ReportFrame(wx.Frame):
         self.output_sizer.Add(wx.StaticLine(self.panel, -1),
                               pos=(1, 1), flag=wx.ALL | wx.EXPAND, border=5, span=wx.GBSpan(1, 16))
 
-        global RACES
-        RACES = [r.split(', ')[1].strip() for r in self.project.export_metadata(
-            fields=['race'])[0]['select_choices_or_calculations'].split('|')]
         self.fill_races()
-
-        global ETHNICITIES
-        ETHNICITIES = [e.split(', ')[1].strip() for e in self.project.export_metadata(
-            fields=['ethnicity'])[0]['select_choices_or_calculations'].split('|')]
         self.fill_ethnicities()
-
-        global GENDERS
-        GENDERS = [e.split(', ')[1].strip() for e in self.project.export_metadata(
-            fields=['gender'])[0]['select_choices_or_calculations'].split('|')]
         self.fill_genders()
         self.fill_zeros()
+
         self.output_sizer.Add(wx.StaticText(self.panel, label='<- Total Enrolled'), pos=(12, 15),
                               flag=wx.ALL | wx.ALIGN_RIGHT, border=5)
 
@@ -259,7 +251,7 @@ class ReportFrame(wx.Frame):
                               pos=(3, 14), flag=wx.ALL | wx.ALIGN_CENTER, border=5)
 
     def fill_zeros(self):
-        for i in range(len(ETHNICITIES)+1):
+        for i in range(len(ETHNICITIES) + 1):
             if i == len(ETHNICITIES):
                 self.fill_column((i * 4) + 2, '0')
             else:
@@ -278,12 +270,12 @@ class ReportFrame(wx.Frame):
         self.participants = None
         self.error.Hide()
         if self.start_date.GetValue() > self.end_date.GetValue():
-            self.export.Disable()
             self.error.SetLabelText('Start date must be earlier than end date.')
             self.error.SetForegroundColour(wx.RED)
             self.error.Show()
             self.sizer.Fit(self)
             self.export.Disable()
+            self.menuExport.Enable(enable=False)
             return
 
         self.enrollments = self.project.export_records(raw_or_label='label', fields=['enrollment', 'grant', 'protocol'])
@@ -291,11 +283,14 @@ class ReportFrame(wx.Frame):
         protocol_selection = [self.protocol_list.GetItems()[i] for i in self.protocol_list.GetSelections()]
         ids = self.filter_enrollments(protocol_selection, grant_selection)
         if ids:
-            self.participants = self.project.export_records(records=ids, raw_or_label='label', fields=['gender', 'ethnicity', 'race'])
+            self.participants = self.project.export_records(records=ids, raw_or_label='label',
+                                                            fields=['gender', 'ethnicity', 'race'])
             self.fill_table(participants=self.participants)
             self.export.Enable()
+            self.menuExport.Enable()
         else:
             self.export.Disable()
+            self.menuExport.Enable(enable=False)
             self.fill_table(string='0')
 
         self.sizer.Fit(self)
@@ -351,7 +346,6 @@ class ReportFrame(wx.Frame):
                 text.GetWindow().SetLabelText(str(len(participants)))
             else:
                 text.GetWindow().SetLabelText(string)
-
 
     def get_count_with_filter(self, participants, race, gender, ethnicity):
         count = 0
