@@ -4,5 +4,5 @@ PyInstaller.__main__.run([
     '--name=NIH_Report',
     '--windowed',
     '--onefile',
-    'report.py'
+    'report_app.py'
 ])
