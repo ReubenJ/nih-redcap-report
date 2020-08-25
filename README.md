@@ -1,5 +1,5 @@
 # nih-redcap-report
-Python interface to report NIH demographic measures from REDCap
+Python desktop application to report NIH demographic measures from REDCap
 
 ### Setting up the project on your own computer
 #### Prerequisites
