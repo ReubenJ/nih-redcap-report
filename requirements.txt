@@ -3,7 +3,7 @@ certifi==2020.6.20
 chardet==3.0.4
 idna==2.10
 numpy==1.19.1
-Pillow==7.2.0
+Pillow==8.1.2
 PyCap==1.1.0
 pyinstaller==4.0
 pyinstaller-hooks-contrib==2020.7
